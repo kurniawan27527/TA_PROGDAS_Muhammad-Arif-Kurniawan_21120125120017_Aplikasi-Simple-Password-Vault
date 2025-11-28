@@ -2,12 +2,14 @@ import base64
 
 # QUEUE
 class Queue:
-    def __init__(self, max_size=10):
+    __max_size = 0
+
+    def __init__(self,max_size=10):
         self.data = []
-        self.max_size = max_size
+        self.__max_size = max_size
 
     def enqueue(self, item):
-        if len(self.data) >= self.max_size:
+        if len(self.data) >= self.__max_size:
             self.data.pop(0)
         self.data.append(item)
 
@@ -32,6 +34,10 @@ class Encryption:
 
 # ACCOUNT
 class Account:
+    __platform = ""
+    __username = ""
+    __password_encrypted = ""
+
     def __init__(self, platform, username, password):
         self.__platform = platform
         self.__username = username
@@ -52,6 +58,8 @@ class Account:
 
 # VAULT MANAGER
 class VaultManager:
+    __accounts = ""
+
     def __init__(self):
         self.__accounts = []
 
