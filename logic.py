@@ -1,3 +1,4 @@
+import os
 import base64
 
 # QUEUE
@@ -77,9 +78,28 @@ class VaultManager:
 
 
 # MASTER PASSWORD
-class MasterPassword:
-    __MASTER = "admin123"
+MASTER_FILE = "Master.txt"
 
-    @staticmethod
-    def check(pwd):
-        return pwd == MasterPassword.__MASTER
+# CREATE + READ
+def get_master_password():
+    # Jika file belum ada → buat default "admin123"
+    if not os.path.exists(MASTER_FILE):
+        with open(MASTER_FILE, "w") as f:
+            f.write("admin123")
+        return "admin123"
+    
+    with open(MASTER_FILE, "r") as f:
+        return f.read().strip()
+
+# UPDATE
+def update_master_password(old_pass, new_pass):
+    current = get_master_password()
+    
+    if old_pass != current:
+        return False, "Password lama salah!"
+    
+    with open(MASTER_FILE, "w") as f:
+        f.write(new_pass)
+
+    return True, "Master password berhasil diperbarui!"
+
