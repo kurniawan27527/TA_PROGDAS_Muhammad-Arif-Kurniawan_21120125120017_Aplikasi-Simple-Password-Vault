@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from logic import (
-    Queue, Account, VaultManager, MasterPassword
+    Queue, Account, VaultManager, get_master_password, update_master_password
 )
 
 
@@ -74,26 +74,26 @@ class LoginWindow(tk.Frame):
             r = int(r1 + (r2 - r1) * i / max(1, height))
             g = int(g1 + (g2 - g1) * i / max(1, height))
             b = int(b1 + (b2 - b1) * i / max(1, height))
+
+            # FIX UTAMA → warna harus diawali #  
             color = f"#{r:02x}{g:02x}{b:02x}"
+
             self.canvas.create_line(0, i, width, i, fill=color, tags="gradient")
+
 
     def on_resize(self, event):
         self.draw_gradient(event.width, event.height)
-        w, h = max(event.width * 0.3, 300), max(event.height * 0.2, 200)
+        w = max(event.width * 0.3, 300)
+        h = max(event.height * 0.2, 200)
         self.card.place(relx=0.5, rely=0.5, anchor="center", width=w, height=h)
 
     def check(self):
-        pwd = self.entry.get()
-        if pwd.strip() == "":
-            return messagebox.showerror("Error", "Master Password tidak boleh kosong!")
-
-        # cek dengan master password tetap
-        if not MasterPassword.check(pwd):
-            return messagebox.showerror("Login Gagal", "Master password salah!")
-
-        # jika benar → catat log dan masuk dashboard
-        self.queue.enqueue(f"Login berhasil menggunakan password: {pwd}")
-        self.switch_page("main")
+        pw = self.entry.get().strip()
+        if pw == get_master_password():
+            self.queue.enqueue("Login berhasil")
+            self.switch_page("main")
+        else:
+            messagebox.showerror("Error", "Master Password salah!")
 
 
 
@@ -165,6 +165,9 @@ class MainApp(tk.Frame):
                        fill_color="#7D3CFF").pack(pady=5)
         rounded_button(btn_frame, "Activity Log", self.show_logs,
                        fill_color="#7D3CFF").pack(pady=5)
+        rounded_button(btn_frame, "Ubah Master Password", self.change_master_password,
+                       fill_color="#7D3CFF").pack(pady=5)
+
 
         logout_container = tk.Frame(self, bg=DASHBOARD_BG)
         logout_container.grid(row=3, column=0, pady=(5, 20))
@@ -261,6 +264,41 @@ class MainApp(tk.Frame):
         self.login_queue.enqueue("Logout pengguna")
         messagebox.showinfo("Logout", "Anda telah keluar.")
         self.switch_page("login")
+
+    def change_master_password(self):
+        win = tk.Toplevel(self)
+        win.title("Ubah Master Password")
+        win.configure(bg=DASHBOARD_BG)
+        win.geometry("350x250")
+        win.resizable(False, False)
+        win.grab_set()
+
+        frame = tk.Frame(win, bg=DASHBOARD_BG)
+        frame.pack(padx=20, pady=20, fill="both", expand=True)
+
+        tk.Label(frame, text="Password Lama:", bg=DASHBOARD_BG, fg=TITLE_FG).pack(anchor="w")
+        old_entry = ttk.Entry(frame, show="*")
+        old_entry.pack(fill="x", pady=5)
+
+        tk.Label(frame, text="Password Baru:", bg=DASHBOARD_BG, fg=TITLE_FG).pack(anchor="w")
+        new_entry = ttk.Entry(frame, show="*")
+        new_entry.pack(fill="x", pady=5)
+
+        def update_pw():
+            old = old_entry.get().strip()
+            new = new_entry.get().strip()
+
+            ok, msg = update_master_password(old, new)
+
+            if ok:
+                messagebox.showinfo("Sukses", msg)
+                self.login_queue.enqueue("Master password diperbarui")
+                win.destroy()
+            else:
+                messagebox.showerror("Error", msg)
+
+        ttk.Button(frame, text="Update", command=update_pw).pack(pady=10)
+
 
 
 # MAIN WINDOW
