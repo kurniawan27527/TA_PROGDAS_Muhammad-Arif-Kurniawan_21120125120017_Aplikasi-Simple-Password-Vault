@@ -3,20 +3,32 @@ import os
 # BASE64 MODULE → digunakan untuk melakukan encoding dan decoding password
 import base64
 
+from datetime import datetime
+
 # QUEUE → Menyimpan log/key history dengan ukuran terbatas (FIFO)
 class Queue:
     __max_size = 0
 
-    def __init__(self,max_size=10):
+    def __init__(self,max_size=None):
         # data → menampung item log
         self.data = []
         self.__max_size = max_size
 
     def enqueue(self, item):
+    # Tambah timestamp
+        timestamp = datetime.now().strftime("%A, %d %B %Y • %H:%M:%S")
+        log = f"[{timestamp}] {item}"
+
+    # Jika tidak ada batas ukuran log
+        if self.__max_size is None:
+            self.data.append(log)
+            return
+
+    # Jika ada batas ukuran log
         if len(self.data) >= self.__max_size:
             self.data.pop(0)
-        # tambahkan item baru
-        self.data.append(item)
+
+        self.data.append(log)
 
     def get_all(self):
         # kembalikan list data (copy)
@@ -24,7 +36,7 @@ class Queue:
 
 
 # ENCRYPTION → Encode/Decode password menggunakan Base64 + Caesar Shift
-class Encryption:
+class Encryption:   
     __SHIFT = 3 # nilai shift untuk Caesar cipher
 
     @staticmethod
