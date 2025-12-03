@@ -144,7 +144,19 @@ class MainApp(tk.Frame):
         card.grid(row=1, column=0, pady=10, padx=20, sticky="nsew")
 
         tk.Label(card, text="Daftar Akun",
-                 bg=CARD_BG, fg=TITLE_FG, font=("Segoe UI", 12, "bold")).pack(pady=5)
+                 bg=CARD_BG, fg=TITLE_FG, font=("Segoe UI", 12, "bold")).pack(pady=5, anchor="w", padx=10)
+
+        # SEARCH BAR - menggunakan place agar tidak menggeser layout
+        search_frame = tk.Frame(card, bg=CARD_BG)
+        search_frame.place(relx=1.0, y=5, anchor="ne")  # kanan atas card
+
+        tk.Label(search_frame, text="Search Akun:", bg=CARD_BG).pack(side="left", padx=5)
+
+        self.search_var = tk.StringVar()
+        tk.Entry(search_frame, textvariable=self.search_var, width=25).pack(side="left", padx=5)
+
+        tk.Button(search_frame, text="Search", command=self.search_account).pack(side="left", padx=5)
+        tk.Button(search_frame, text="Reset", command=self.refresh_table).pack(side="left", padx=5)
 
         # Treeview daftar akun
         tree_frame = tk.Frame(card, bg=CARD_BG)
@@ -201,15 +213,24 @@ class MainApp(tk.Frame):
         rounded_button(logout_container, "Logout",
                        self.logout, fill_color="#FF5722").pack()
 
-        self.refresh()
+        self.refresh_table()
 
-    # Refresh daftar akun di treeview
-    def refresh(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        for acc in self.vault.get_all_accounts():
+    def get_sorted_accounts(self):
+        # Ambil semua akun dari Vault lalu urutkan alfabet berdasarkan platform
+        return sorted(self.vault.get_all_accounts(), key=lambda a: a.get_platform().lower())
+
+
+    # refresh_table daftar akun di treeview
+    def refresh_table(self):
+        # Kosongkan tabel treeview
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        # Masukkan kembali akun yang sudah disortir
+        for acc in self.get_sorted_accounts():
             self.tree.insert("", "end",
-                             values=(acc.get_platform(), acc.get_username()))
+                            values=(acc.get_platform(), acc.get_username()))
+
 
     # CRUD: Tambah akun
     def add_account(self):
@@ -251,7 +272,7 @@ class MainApp(tk.Frame):
                 return messagebox.showerror("Error", "Semua kolom harus diisi!")
             self.vault.add(Account(platform, username, password))
             self.login_queue.enqueue(f"Tambah akun: {platform} ({username})")
-            self.refresh()
+            self.refresh_table()
             win.destroy()
 
         ttk.Button(frame, text="Save Account", command=save).pack(pady=10, side='right')
@@ -288,13 +309,12 @@ class MainApp(tk.Frame):
                                f"Yakin ingin menghapus {acc.get_platform()} ({acc.get_username()})?"):
             self.login_queue.enqueue(f"Hapus akun: {acc.get_platform()} ({acc.get_username()})")
             self.vault.delete(index)
-            self.refresh()
+            self.refresh_table()
 
     # Log aktivitas
     def show_logs(self):
-        logs = self.login_queue.get_all()
-        msg = "--- Activity Log (max 10) ---\n" + "\n".join(logs)
-        messagebox.showinfo("Login Log", msg)
+        self.master.pages["log"].refresh_table()
+        self.master.switch("log")
 
     # Logout
     def logout(self):
@@ -336,7 +356,79 @@ class MainApp(tk.Frame):
                 messagebox.showerror("Error", msg)
 
         ttk.Button(frame, text="Update", command=update_pw).pack(pady=10)
+    
+    # Search Akun
+    def search_account(self):
+        keyword = self.search_var.get().lower().strip()
 
+        # Hapus tabel
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        # Ambil akun
+        accounts = self.vault.get_all_accounts()
+
+        # Filter
+        filtered = [
+            acc for acc in accounts
+            if keyword in acc.get_platform().lower() 
+            or keyword in acc.get_username().lower()
+        ]
+
+        if not filtered:
+            self.tree.insert("", "end", values=("Tidak ditemukan", "-"))
+            return
+
+        # Masukkan hasil
+        for acc in sorted(filtered, key=lambda x: x.get_platform().lower()):
+            self.tree.insert("", "end",
+                            values=(acc.get_platform(), acc.get_username()))
+
+
+
+# Halaamn Activity Log
+class ActivityLogPage(tk.Frame):
+    def __init__(self, master, login_queue):
+        super().__init__(master)
+        self.login_queue = login_queue
+        self.configure(bg=DASHBOARD_BG)
+
+        tk.Label(self, text="📜 Activity Log",
+                 bg=DASHBOARD_BG, fg=TITLE_FG, font=("Segoe UI", 16, "bold")
+                 ).pack(pady=15)
+
+        # Card log
+        card = tk.Frame(self, bg=CARD_BG, bd=0,
+                        highlightbackground="#C59CFF", highlightthickness=1)
+        card.pack(padx=20, pady=10, fill="both", expand=True)
+
+        # Textbox Log
+        self.text = tk.Text(card, wrap="word", bg=TREE_BG,
+                            fg="black", font=("Segoe UI", 10))
+        self.text.pack(side="left", fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(card, orient="vertical",
+                                  command=self.text.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.text.configure(yscrollcommand=scrollbar.set)
+
+        # Tombol kembali
+        rounded_button(self, "⬅ Kembali ke Dashboard",
+                       lambda: master.switch("main"),
+                       fill_color="#7D3CFF").pack(pady=15)
+
+        # Tampilkan log saat halaman dibuka
+        self.refresh_table()
+
+    def refresh_table(self):
+        self.text.delete("1.0", "end")
+        logs = self.login_queue.get_all()
+
+        if not logs:
+            self.text.insert("end", "(Belum ada aktivitas)")
+        else:
+            for log in logs:
+                self.text.insert("end", log + "\n\n")
 
 
 # MAIN WINDOW → Frame utama yang mengatur halaman login & dashboard
@@ -361,8 +453,10 @@ class Window(tk.Tk):
         # Halaman
         self.pages = {
             "login": LoginWindow(self, self.login_queue, self.switch),
-            "main": MainApp(self, self.vault, self.login_queue)
+            "main": MainApp(self, self.vault, self.login_queue),
+            "log": ActivityLogPage(self, self.login_queue)
         }
+
 
         self.pages["login"].pack(fill="both", expand=True)
 
@@ -372,7 +466,10 @@ class Window(tk.Tk):
         """
         for p in self.pages.values():
             p.pack_forget()
-        self.pages[name].pack(fill="both", expand=True)
+            self.pages[name].pack(fill="both", expand=True)
+
+        if name == "log":
+            self.pages["log"].refresh_table()
 
 
 # RUN PROGRAM
